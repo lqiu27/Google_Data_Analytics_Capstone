@@ -1,0 +1,118 @@
+---
+title: "Case Study - Wellness Technology"
+author: "Clem Qiu"
+date: "10/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This case study serves as the capstone project of the Coursera course *Google Data Analytics Capstone: Complete a Case Study*, part of *Google Data Analytics Professional Certificate* program.
+All data used in this case study is from the data source supplied in the course at the following address:
+[https://www.kaggle.com/arashnic/fitbit](https://www.kaggle.com/arashnic/fitbit).
+
+## Executive Summary
+
+This report tends to provide insights on user data from a non-Bellabeat fitness devices to shed some light on additional features can be added to **Bellabeat App** so that better user experience can be achieved. With the abundance data on users' activities, calories and sleep patterns, the app can offer straightforward feedback on their fitness level. This feature will attract women with a busy schedule who care about their health condition.
+
+## Business Task
+Identify statistical trends in user data from a non-Bellabeat fitness devices. Propose recommendations based on these findings.
+
+## Prep
+Given the nature of this business task is data analysis, tidyverse package needs to be installed.
+```{r}
+install.packages('tidyverse')
+library(tidyverse)
+```
+
+## Relevant Datasets
+Based on the product portfolio of Bellabeat and potential clientele, data describing weight, daily activities and sleep are used.
+
+```{r}
+weightinfo <- read.csv(file='weightLogInfo_merged.csv')
+head(weightinfo)
+nrow(weightinfo)
+n_distinct(weightinfo$Id)
+```
+
+Cross-check data range with other data sets.
+```{r}
+dailysteps <- read.csv(file='dailySteps_merged.csv')
+head(dailysteps)
+n_distinct(dailysteps$Id)
+
+dailycal <- read.csv(file='dailyCalories_merged.csv')
+head(dailycal)
+n_distinct(dailycal$Id)
+
+dailysleep <- read.csv(file='sleepDay_merged.csv')
+head(dailysleep)
+n_distinct(dailysleep$Id)
+```
+
+## Preliminary Review on Selected Data
+Number of observations in weight data set seems considerably lower than other groups. Further investigate if this data set will be meaningful in the scope of this case study.
+```{r}
+weightinfo %>%
+  group_by(Id)%>%
+  summarise(mean = mean(WeightKg), nw=n())
+ggplot(subset(weightinfo, Id %in% c("6962181067", "8877689391"))) + geom_point(aes(x=Date, y=WeightKg, color=Id))
+```
+
+As the date shown above, only two users' weight information is recorded for a continuous period. Further more, there is no drastic fluctuation over time.
+
+## Data Analysis
+Since the date on weight is insufficient compared to other data sets, data analysis was focused on sleep and daily activities. Daily activities can be directed measured through number of daily steps. However, stress levels and sleep quality cannot be directly evaluated by data available in this case study. Sleep quality is represented by an efficiency concept, where total time in bed is divided by total time asleep, to demonstrate how well the users rest during their sleep time. The maximum is 1, which means a user falls asleep right away when he or she goes to bed while the minimum is 0, which means a user doesn't get much sleep at all.
+```{r}
+sleep <- dailysleep %>%
+    select(Id, TotalMinutesAsleep, TotalTimeInBed) %>%
+    mutate(
+      sleepquality = TotalMinutesAsleep / TotalTimeInBed,
+    )
+```
+
+Summarize each data set to grasp the overall evaluation.
+```{r}
+sleepsum <- sleep %>%
+    group_by(Id)%>%
+    summarise(sqmean = mean(sleepquality), n1=n())
+
+calsum <- dailycal %>%
+    group_by(Id)%>%
+    summarise(calmean = mean(Calories), n2=n())
+
+stepssum <- dailysteps %>%
+    group_by(Id)%>%
+    summarise(stepmean = mean(StepTotal), n3=n())
+stepssum
+```
+
+Combine data from different aspects to see insights.
+```{r}
+combined <- left_join(sleepsum, calsum, by='Id')
+combined <- right_join(combined, stepssum, by='Id')
+combined
+
+ggplot(combined, aes(x=stepmean, y=calmean))+
+  geom_point()+
+  ggtitle("Correlation between Daily Steps and Daily Calories")+
+  xlab("Number of Steps in a Day")+
+  ylab("Calories Recorded in a Day")+
+  geom_smooth(method=lm)
+
+ggplot(combined, aes(x=calmean, y=sqmean)) +
+  geom_point()+
+  ggtitle("Sleep Quality versus Calories Burnt")+
+  xlab("Calories Recorded in a Day")+
+  ylab("Real Sleep Hours over In Bed Hours")
+```
+From the plots above, one can observe that, first, number of steps taken is a good indicator of calories burnt. Second, daily calories burnt by these users range from 1500 to 3500. Averagely speaking, the most active user burns more than twice the energy than the most sedentary user. Third, these users generally have a good sleep quality,above 0.9, which means that they manage to fall asleep and remain asleep while they are in bed, even though the physical intensity of their daily activities varies remarkably. However, a certain amount of physical activity may need to be achieved so that one can maintain good sleep quality.
+
+## Recommendations
+The followings recommendations are proposed according to the analysis performed above to the marketing plan of **Bellabeat App**.
+
+ * Targeting users who want to monitor and improve their sleep quality 
+ * A minimum amount of physical activity required to maintain good sleep quality and moderate stress level
+ * More weight information is needed to explore 
